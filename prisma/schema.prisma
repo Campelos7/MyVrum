@@ -1,0 +1,195 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id              Int       @id @default(autoincrement())
+  firstName       String
+  lastName        String
+  username        String    @unique
+  email           String    @unique
+  phone           String
+  country         String
+  address         String
+  password        String
+  image           String?
+  vendedor        Boolean   @default(false)
+  nif             String?
+  admin           Boolean   @default(false)
+  bloqueado       Boolean   @default(false)
+  motivoBloqueio  String?
+  emailValidado   Boolean   @default(false)
+  tokenValidacao  String?
+  aprovadoPor     Int?
+  aprovadoPorUser User?     @relation("Aprovacoes", fields: [aprovadoPor], references: [id])
+  createdAt       DateTime  @default(now())
+
+  // Relações
+  anuncios        Anuncio[]
+  reservas        Reserva[]
+  visitas         Visita[]
+  encomendas      Encomenda[]
+  filtrosFavoritos FiltroFavorito[]
+  marcasFavoritas MarcaFavorita[]
+  denunciasEnviadas Denuncia[] @relation("DenunciasEnviadas")
+  denunciasRecebidas Denuncia[] @relation("DenunciasRecebidas")
+  utilizadoresAprovados User[]  @relation("Aprovacoes")
+  acoesAdmin      AcaoAdministrativa[]
+  mensagensEnviadas Mensagem[] @relation("MensagensEnviadas")
+  mensagensRecebidas Mensagem[] @relation("MensagensRecebidas")
+  notificacoes    Notificacao[]
+}
+
+model Anuncio {
+  id            String   @id @default(cuid())
+  titulo        String
+  marca         String?
+  modelo        String?
+  categoria     String?  // ex: Sedan, SUV, Hatchback
+  ano           Int?
+  anoMin        Int?
+  anoMax        Int?
+  preco         Float?
+  quilometragem Int?
+  combustivel   String?  // Gasolina, Diesel, Elétrico, Híbrido
+  caixa         String?  // Manual, Automática
+  localizacao   String?
+  descricao     String?
+  estado        String   @default("ativo") // ativo, reservado, vendido, pausado
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relações
+  imagens       ImagemAnuncio[]
+  reservas      Reserva[]
+  visitas       Visita[]
+  encomendas    Encomenda[]
+  denuncias     Denuncia[]
+  mensagens     Mensagem[]
+  notificacoes  Notificacao[]
+}
+
+model ImagemAnuncio {
+  id        String   @id @default(cuid())
+  url       String
+  anuncioId String
+  anuncio   Anuncio  @relation(fields: [anuncioId], references: [id], onDelete: Cascade)
+  ordem     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Reserva {
+  id          String   @id @default(cuid())
+  anuncioId   String
+  anuncio     Anuncio  @relation(fields: [anuncioId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      String   @default("pendente") // pendente, aprovado, recusado
+  expiraEm    DateTime?
+  respondidoEm DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model Visita {
+  id          String   @id @default(cuid())
+  anuncioId   String
+  anuncio     Anuncio  @relation(fields: [anuncioId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dataHora    DateTime
+  createdAt   DateTime @default(now())
+}
+
+model Encomenda {
+  id          String   @id @default(cuid())
+  anuncioId   String
+  anuncio     Anuncio  @relation(fields: [anuncioId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  estado      String   @default("pendente") // pendente, pago, cancelado
+  valor       Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FiltroFavorito {
+  id          String   @id @default(cuid())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nome        String
+  filtros     String   // JSON com os filtros
+  createdAt   DateTime @default(now())
+}
+
+model MarcaFavorita {
+  id          String   @id @default(cuid())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marca       String
+  createdAt   DateTime @default(now())
+}
+
+model Denuncia {
+  id          String   @id @default(cuid())
+  tipo        String   // "anuncio" ou "utilizador"
+  anuncioId   String?
+  anuncio     Anuncio? @relation(fields: [anuncioId], references: [id], onDelete: Cascade)
+  denunciadoId Int?
+  denunciado  User?    @relation("DenunciasRecebidas", fields: [denunciadoId], references: [id], onDelete: Cascade)
+  denuncianteId Int
+  denunciante User    @relation("DenunciasEnviadas", fields: [denuncianteId], references: [id], onDelete: Cascade)
+  motivo      String
+  descricao   String?
+  estado      String   @default("aberta") // aberta, em_analise, encerrada
+  resultado   String?  // "procedente" ou "nao_procedente"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relações
+  acoes       AcaoAdministrativa[]
+}
+
+model AcaoAdministrativa {
+  id          String   @id @default(cuid())
+  tipo        String   // "bloqueio", "aprovacao_vendedor", "moderacao_anuncio", "analise_denuncia"
+  adminId     Int
+  admin       User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  denunciaId  String?
+  denuncia    Denuncia? @relation(fields: [denunciaId], references: [id], onDelete: Cascade)
+  descricao   String?
+  dados       String?  // JSON com dados adicionais
+  createdAt   DateTime @default(now())
+}
+
+model Mensagem {
+  id          String   @id @default(cuid())
+  anuncioId   String
+  anuncio     Anuncio  @relation(fields: [anuncioId], references: [id], onDelete: Cascade)
+  remetenteId Int
+  remetente   User     @relation("MensagensEnviadas", fields: [remetenteId], references: [id], onDelete: Cascade)
+  destinatarioId Int
+  destinatario User    @relation("MensagensRecebidas", fields: [destinatarioId], references: [id], onDelete: Cascade)
+  conteudo    String
+  lida        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Notificacao {
+  id          String   @id @default(cuid())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tipo        String   // "nova_marca_favorita", "denuncia_recebida", "mensagem_nova"
+  titulo      String
+  mensagem    String
+  anuncioId   String?
+  anuncio     Anuncio? @relation(fields: [anuncioId], references: [id], onDelete: Cascade)
+  lida        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
